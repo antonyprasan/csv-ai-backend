@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Sheets AI Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        input, textarea, button {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #357abd;
+        }
+        .result {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Google Sheets AI Integration Test</h1>
+        
+        <!-- Authentication Section -->
+        <div class="section">
+            <h2>Step 1: Google Authentication</h2>
+            <button onclick="authenticate()">Authenticate with Google</button>
+            <button onclick="checkAuthStatus()" style="background-color: #28a745; margin-left: 10px;">Check Auth Status</button>
+            <div id="authResult" class="result"></div>
+        </div>
+
+        <!-- Test Connection Section -->
+        <div class="section">
+            <h2>Step 2: Test Google Sheets Connection</h2>
+            <input type="text" id="spreadsheetId" placeholder="Enter Spreadsheet ID (from Google Sheets URL)" />
+            <input type="text" id="range" placeholder="Enter Range (e.g., A1:D10)" value="A1:D10" />
+            <button onclick="testConnection()">Test Connection</button>
+            <div id="testResult" class="result"></div>
+        </div>
+
+        <!-- AI Query Section -->
+        <div class="section">
+            <h2>Step 3: Ask AI About Your Data</h2>
+            <textarea id="question" placeholder="Ask a question about your spreadsheet data (e.g., 'What is the total sales for each month?')" rows="3"></textarea>
+            <button onclick="askAI()">Ask AI</button>
+            <div id="aiResult" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        let accessToken = null;
+
+        async function authenticate() {
+            try {
+                const response = await fetch('/auth/google');
+                const data = await response.json();
+                
+                // Redirect to Google OAuth
+                window.location.href = data.authUrl;
+
+            } catch (error) {
+                document.getElementById('authResult').innerHTML = 
+                    `<div class="error">❌ Authentication failed: ${error.message}</div>`;
+            }
+        }
+
+        // Check for authentication callback when page loads
+        window.addEventListener('load', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+            if (token) {
+                accessToken = token;
+                document.getElementById('authResult').innerHTML = 
+                    '<div class="success">✅ Authentication successful! You can now test the connection.</div>';
+                
+                // Clean up the URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        });
+
+        // Add a function to check authentication status
+        function checkAuthStatus() {
+            if (accessToken) {
+                document.getElementById('authResult').innerHTML = 
+                    '<div class="success">✅ Already authenticated! You can test the connection.</div>';
+            }
+        }
+
+        async function testConnection() {
+            if (!accessToken) {
+                document.getElementById('testResult').innerHTML = 
+                    '<div class="error">❌ Please authenticate first!</div>';
+                return;
+            }
+
+            const spreadsheetId = document.getElementById('spreadsheetId').value;
+            const range = document.getElementById('range').value;
+
+            if (!spreadsheetId) {
+                document.getElementById('testResult').innerHTML = 
+                    '<div class="error">❌ Please enter a Spreadsheet ID</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/test-sheets', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        spreadsheetId,
+                        range,
+                        accessToken
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('testResult').innerHTML = 
+                        `<div class="success">✅ ${data.message}</div>
+                         <strong>Sample Data:</strong>
+                         ${JSON.stringify(data.data.slice(0, 3), null, 2)}`;
+                } else {
+                    document.getElementById('testResult').innerHTML = 
+                        `<div class="error">❌ ${data.error}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('testResult').innerHTML = 
+                    `<div class="error">❌ Connection failed: ${error.message}</div>`;
+            }
+        }
+
+        async function askAI() {
+            if (!accessToken) {
+                document.getElementById('aiResult').innerHTML = 
+                    '<div class="error">❌ Please authenticate first!</div>';
+                return;
+            }
+
+            const spreadsheetId = document.getElementById('spreadsheetId').value;
+            const range = document.getElementById('range').value;
+            const question = document.getElementById('question').value;
+
+            if (!spreadsheetId || !question) {
+                document.getElementById('aiResult').innerHTML = 
+                    '<div class="error">❌ Please enter both Spreadsheet ID and question</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/ask-sheets', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        spreadsheetId,
+                        range,
+                        question,
+                        accessToken
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.answer) {
+                    document.getElementById('aiResult').innerHTML = 
+                        `<div class="success">
+                            <strong>AI Answer:</strong> ${data.answer}
+                            ${data.labels && data.data ? `
+                            <br><strong>Chart Data:</strong>
+                            <br>Labels: ${JSON.stringify(data.labels)}
+                            <br>Data: ${JSON.stringify(data.data)}
+                            <br>Chart Type: ${data.type}
+                            ` : ''}
+                        </div>`;
+                } else {
+                    document.getElementById('aiResult').innerHTML = 
+                        `<div class="error">❌ ${data.error || 'Failed to get AI response'}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('aiResult').innerHTML = 
+                    `<div class="error">❌ AI query failed: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

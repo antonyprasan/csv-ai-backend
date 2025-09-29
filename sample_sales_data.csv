@@ -1,0 +1,16 @@
+Month,Product,Sales,Units,Revenue,Category
+January,Laptop,45,45,67500,Electronics
+January,Mouse,120,120,3600,Accessories
+January,Keyboard,85,85,8500,Accessories
+February,Laptop,52,52,78000,Electronics
+February,Mouse,95,95,2850,Accessories
+February,Keyboard,110,110,11000,Accessories
+March,Laptop,38,38,57000,Electronics
+March,Mouse,150,150,4500,Accessories
+March,Keyboard,75,75,7500,Accessories
+April,Laptop,61,61,91500,Electronics
+April,Mouse,88,88,2640,Accessories
+April,Keyboard,92,92,9200,Accessories
+May,Laptop,47,47,70500,Electronics
+May,Mouse,135,135,4050,Accessories
+May,Keyboard,105,105,10500,Accessories
