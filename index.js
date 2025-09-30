@@ -191,6 +191,55 @@ app.get('/auth/callback', async (req, res) => {
   }
 });
 
+// List Google Sheets endpoint
+app.post('/api/list-sheets', async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+
+    if (!accessToken) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Access token required. Please authenticate first.',
+        authUrl: getAuthUrl()
+      });
+    }
+
+    const oAuth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
+    
+    oAuth2Client.setCredentials({ access_token: accessToken });
+    const drive = google.drive({ version: 'v3', auth: oAuth2Client });
+
+    // Get files from Google Drive that are Google Sheets
+    const response = await drive.files.list({
+      q: "mimeType='application/vnd.google-apps.spreadsheet'",
+      fields: 'files(id, name, modifiedTime)',
+      orderBy: 'modifiedTime desc'
+    });
+
+    const sheetsList = response.data.files.map(file => ({
+      id: file.id,
+      name: file.name,
+      modifiedTime: file.modifiedTime
+    }));
+
+    res.json({
+      success: true,
+      sheets: sheetsList
+    });
+
+  } catch (err) {
+    console.error('Error listing sheets:', err);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch Google Sheets: ' + err.message
+    });
+  }
+});
+
 // Test endpoint to verify Google Sheets connection
 app.post('/api/test-sheets', async (req, res) => {
   try {
