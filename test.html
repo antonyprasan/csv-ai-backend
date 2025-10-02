@@ -24,7 +24,7 @@
             border: 1px solid #ddd;
             border-radius: 5px;
         }
-        input, textarea, button {
+        input, textarea, button, select {
             width: 100%;
             padding: 10px;
             margin: 5px 0;
@@ -69,12 +69,18 @@
             <button onclick="authenticate()">Authenticate with Google</button>
             <button onclick="checkAuthStatus()" style="background-color: #28a745; margin-left: 10px;">Check Auth Status</button>
             <div id="authResult" class="result"></div>
+            <div id="debugInfo" style="font-size: 12px; color: #666; margin-top: 10px;">
+                Debug: accessToken = <span id="tokenStatus">null</span>
+            </div>
         </div>
 
         <!-- Test Connection Section -->
         <div class="section">
-            <h2>Step 2: Test Google Sheets Connection</h2>
-            <input type="text" id="spreadsheetId" placeholder="Enter Spreadsheet ID (from Google Sheets URL)" />
+            <h2>Step 2: Select Google Sheet</h2>
+            <button onclick="loadSheets()" style="background-color: #17a2b8; margin-bottom: 10px;">Load My Google Sheets</button>
+            <select id="spreadsheetSelect" style="width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+                <option value="">Select a Google Sheet...</option>
+            </select>
             <input type="text" id="range" placeholder="Enter Range (e.g., A1:D10)" value="A1:D10" />
             <button onclick="testConnection()">Test Connection</button>
             <div id="testResult" class="result"></div>
@@ -110,21 +116,72 @@
         window.addEventListener('load', async () => {
             const urlParams = new URLSearchParams(window.location.search);
             const token = urlParams.get('token');
+            console.log('Page loaded, URL params:', window.location.search);
+            console.log('Token found:', token);
             if (token) {
                 accessToken = token;
                 document.getElementById('authResult').innerHTML = 
-                    '<div class="success">✅ Authentication successful! You can now test the connection.</div>';
+                    '<div class="success">✅ Authentication successful! You can now load your Google Sheets.</div>';
+                document.getElementById('tokenStatus').textContent = 'SET';
                 
                 // Clean up the URL
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
         });
 
+        // Load Google Sheets into dropdown
+        async function loadSheets() {
+            if (!accessToken) {
+                document.getElementById('testResult').innerHTML = 
+                    '<div class="error">❌ Please authenticate first!</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/list-sheets', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        accessToken
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success && data.sheets) {
+                    const select = document.getElementById('spreadsheetSelect');
+                    select.innerHTML = '<option value="">Select a Google Sheet...</option>';
+                    
+                    data.sheets.forEach(sheet => {
+                        const option = document.createElement('option');
+                        option.value = sheet.id;
+                        option.textContent = `${sheet.name} (Modified: ${new Date(sheet.modifiedTime).toLocaleDateString()})`;
+                        select.appendChild(option);
+                    });
+                    
+                    document.getElementById('testResult').innerHTML = 
+                        `<div class="success">✅ Loaded ${data.sheets.length} Google Sheets</div>`;
+                } else {
+                    document.getElementById('testResult').innerHTML = 
+                        `<div class="error">❌ ${data.error || 'Failed to load Google Sheets'}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('testResult').innerHTML = 
+                    `<div class="error">❌ Failed to load sheets: ${error.message}</div>`;
+            }
+        }
+
         // Add a function to check authentication status
         function checkAuthStatus() {
+            document.getElementById('tokenStatus').textContent = accessToken ? 'SET' : 'null';
             if (accessToken) {
                 document.getElementById('authResult').innerHTML = 
                     '<div class="success">✅ Already authenticated! You can test the connection.</div>';
+            } else {
+                document.getElementById('authResult').innerHTML = 
+                    '<div class="error">❌ Not authenticated. Please authenticate first.</div>';
             }
         }
 
@@ -135,12 +192,12 @@
                 return;
             }
 
-            const spreadsheetId = document.getElementById('spreadsheetId').value;
+            const spreadsheetId = document.getElementById('spreadsheetSelect').value;
             const range = document.getElementById('range').value;
 
             if (!spreadsheetId) {
                 document.getElementById('testResult').innerHTML = 
-                    '<div class="error">❌ Please enter a Spreadsheet ID</div>';
+                    '<div class="error">❌ Please select a Google Sheet from the dropdown</div>';
                 return;
             }
 
@@ -181,13 +238,13 @@
                 return;
             }
 
-            const spreadsheetId = document.getElementById('spreadsheetId').value;
+            const spreadsheetId = document.getElementById('spreadsheetSelect').value;
             const range = document.getElementById('range').value;
             const question = document.getElementById('question').value;
 
             if (!spreadsheetId || !question) {
                 document.getElementById('aiResult').innerHTML = 
-                    '<div class="error">❌ Please enter both Spreadsheet ID and question</div>';
+                    '<div class="error">❌ Please select a Google Sheet and enter a question</div>';
                 return;
             }
 

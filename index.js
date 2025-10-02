@@ -240,6 +240,53 @@ app.post('/api/list-sheets', async (req, res) => {
   }
 });
 
+// List Google Sheets endpoint
+app.post('/api/list-sheets', async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+
+    if (!accessToken) {
+      return res.status(400).json({ 
+        error: 'Access token required. Please authenticate first.',
+        authUrl: getAuthUrl()
+      });
+    }
+
+    const oAuth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      'https://csv-ai-backend.onrender.com/auth/callback'
+    );
+    
+    oAuth2Client.setCredentials({ access_token: accessToken });
+    const drive = google.drive({ version: 'v3', auth: oAuth2Client });
+
+    // List Google Sheets files
+    const response = await drive.files.list({
+      q: "mimeType='application/vnd.google-apps.spreadsheet'",
+      fields: 'files(id, name, modifiedTime)',
+      orderBy: 'modifiedTime desc',
+      pageSize: 50
+    });
+
+    const sheets = response.data.files.map(file => ({
+      id: file.id,
+      name: file.name,
+      modifiedTime: file.modifiedTime
+    }));
+
+    res.json({ 
+      success: true, 
+      sheets: sheets,
+      message: `Found ${sheets.length} Google Sheets`
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to load Google Sheets', details: err.message });
+  }
+});
+
 // Test endpoint to verify Google Sheets connection
 app.post('/api/test-sheets', async (req, res) => {
   try {
