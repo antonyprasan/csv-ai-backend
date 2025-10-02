@@ -77,7 +77,7 @@
         <!-- Test Connection Section -->
         <div class="section">
             <h2>Step 2: Select Google Sheet</h2>
-            <button onclick="loadSheets()" style="background-color: #17a2b8; margin-bottom: 10px;">Load My Google Sheets</button>
+            <button onclick="loadSheets()" id="loadSheetsBtn" style="background-color: #17a2b8; margin-bottom: 10px; font-size: 16px; padding: 12px;">📊 Load My Google Sheets</button>
             <select id="spreadsheetSelect" style="width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
                 <option value="">Select a Google Sheet...</option>
             </select>
@@ -131,11 +131,18 @@
 
         // Load Google Sheets into dropdown
         async function loadSheets() {
+            console.log('loadSheets called, accessToken:', accessToken);
             if (!accessToken) {
                 document.getElementById('testResult').innerHTML = 
                     '<div class="error">❌ Please authenticate first!</div>';
                 return;
             }
+
+            // Show loading state
+            const loadBtn = document.getElementById('loadSheetsBtn');
+            const originalText = loadBtn.textContent;
+            loadBtn.textContent = '⏳ Loading...';
+            loadBtn.disabled = true;
 
             try {
                 const response = await fetch('/api/list-sheets', {
@@ -170,6 +177,10 @@
             } catch (error) {
                 document.getElementById('testResult').innerHTML = 
                     `<div class="error">❌ Failed to load sheets: ${error.message}</div>`;
+            } finally {
+                // Reset button
+                loadBtn.textContent = originalText;
+                loadBtn.disabled = false;
             }
         }
 
