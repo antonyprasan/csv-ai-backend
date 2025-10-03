@@ -122,12 +122,12 @@ function removeDuplicates(data) {
   });
 }
 
-function createOptimizedPrompt(data, question, summary) {
+function createOptimizedPrompt(processedData, question, summary) {
   let prompt = `You are an expert data analyst. Analyze the following data and answer the question.
 
 Data Summary:
-- Total Records: ${summary.totalRecords}
-- Sample Size: ${summary.sampleSize}
+- Total Records: ${processedData.totalRecords || summary.totalRecords}
+- Sample Size: ${processedData.sampleSize || summary.sampleSize}
 - Columns: ${summary.columns.join(', ')}
 - Numeric Columns: ${summary.numericColumns.join(', ')}
 - Date Columns: ${summary.dateColumns.join(', ')}
@@ -143,7 +143,7 @@ Data Summary:
     });
   }
 
-  prompt += `\nSample Data (${summary.sampleSize} records):\n${JSON.stringify(data.fullData, null, 2)}
+  prompt += `\nSample Data (${processedData.sampleSize || summary.sampleSize} records):\n${JSON.stringify(processedData.fullData, null, 2)}
 
 Question: ${question}
 

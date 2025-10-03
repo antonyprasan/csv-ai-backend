@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Google Sheets AI Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -92,6 +93,9 @@
             <textarea id="question" placeholder="Ask a question about your spreadsheet data (e.g., 'What is the total sales for each month?')" rows="3"></textarea>
             <button onclick="askAI()">Ask AI</button>
             <div id="aiResult" class="result"></div>
+            <div id="chartContainer" style="margin-top: 20px;">
+                <canvas id="chartCanvas" width="400" height="200"></canvas>
+            </div>
         </div>
     </div>
 
@@ -279,21 +283,135 @@
                     document.getElementById('aiResult').innerHTML = 
                         `<div class="success">
                             <strong>AI Answer:</strong> ${data.answer}
-                            ${data.labels && data.data ? `
-                            <br><strong>Chart Data:</strong>
-                            <br>Labels: ${JSON.stringify(data.labels)}
-                            <br>Data: ${JSON.stringify(data.data)}
-                            <br>Chart Type: ${data.type}
-                            ` : ''}
                         </div>`;
+                    
+                    // Render chart if chart data is available
+                    if (data.labels && data.data && data.type) {
+                        renderChart(data.labels, data.data, data.type);
+                    } else {
+                        // Hide chart if no chart data
+                        document.getElementById('chartContainer').style.display = 'none';
+                    }
                 } else {
                     document.getElementById('aiResult').innerHTML = 
                         `<div class="error">❌ ${data.error || 'Failed to get AI response'}</div>`;
+                    document.getElementById('chartContainer').style.display = 'none';
                 }
             } catch (error) {
                 document.getElementById('aiResult').innerHTML = 
                     `<div class="error">❌ AI query failed: ${error.message}</div>`;
             }
+        }
+
+        // Chart rendering function
+        function renderChart(labels, data, type) {
+            const ctx = document.getElementById('chartCanvas').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (window.currentChart) {
+                window.currentChart.destroy();
+            }
+            
+            // Show chart container
+            document.getElementById('chartContainer').style.display = 'block';
+            
+            let chartConfig = {};
+            
+            if (type === 'pie') {
+                // Handle pie chart data format
+                let chartData = [];
+                let chartLabels = [];
+                
+                if (Array.isArray(data) && data.length > 0) {
+                    // If data is array of objects with product and total_sales
+                    if (typeof data[0] === 'object' && data[0].product) {
+                        data.forEach(item => {
+                            chartLabels.push(item.product);
+                            chartData.push(item.total_sales);
+                        });
+                    } else {
+                        // If data is simple array of numbers
+                        chartLabels = labels;
+                        chartData = data;
+                    }
+                } else {
+                    chartLabels = labels;
+                    chartData = data;
+                }
+                
+                chartConfig = {
+                    type: 'pie',
+                    data: {
+                        labels: chartLabels,
+                        datasets: [{
+                            data: chartData,
+                            backgroundColor: [
+                                '#FF6384',
+                                '#36A2EB', 
+                                '#FFCE56',
+                                '#4BC0C0',
+                                '#9966FF',
+                                '#FF9F40'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Data Visualization'
+                            }
+                        }
+                    }
+                };
+            } else if (type === 'bar') {
+                chartConfig = {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Values',
+                            data: data,
+                            backgroundColor: '#36A2EB'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Bar Chart'
+                            }
+                        }
+                    }
+                };
+            } else if (type === 'line') {
+                chartConfig = {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Values',
+                            data: data,
+                            borderColor: '#36A2EB',
+                            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Line Chart'
+                            }
+                        }
+                    }
+                };
+            }
+            
+            window.currentChart = new Chart(ctx, chartConfig);
         }
     </script>
 </body>

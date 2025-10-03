@@ -15,7 +15,7 @@ function getAuthUrl() {
       'https://www.googleapis.com/auth/spreadsheets.readonly',
       'https://www.googleapis.com/auth/drive.readonly'
     ],
-    redirect_uri: 'https://csv-ai-backend.onrender.com/auth/callback'
+        redirect_uri: 'https://csv-ai-backend.onrender.com/auth/callback'
   });
 }
 
