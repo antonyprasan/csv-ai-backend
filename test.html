@@ -70,9 +70,6 @@
             <button onclick="authenticate()">Authenticate with Google</button>
             <button onclick="checkAuthStatus()" style="background-color: #28a745; margin-left: 10px;">Check Auth Status</button>
             <div id="authResult" class="result"></div>
-            <div id="debugInfo" style="font-size: 12px; color: #666; margin-top: 10px;">
-                Debug: accessToken = <span id="tokenStatus">null</span>
-            </div>
         </div>
 
         <!-- Test Connection Section -->
@@ -82,14 +79,11 @@
             <select id="spreadsheetSelect" style="width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
                 <option value="">Select a Google Sheet...</option>
             </select>
-            <input type="text" id="range" placeholder="Enter Range (e.g., A1:D10)" value="A1:D10" />
-            <button onclick="testConnection()">Test Connection</button>
-            <div id="testResult" class="result"></div>
         </div>
 
         <!-- AI Query Section -->
         <div class="section">
-            <h2>Step 3: Ask AI About Your Data</h2>
+            <h2>Step 2: Ask AI About Your Data</h2>
             <textarea id="question" placeholder="Ask a question about your spreadsheet data (e.g., 'What is the total sales for each month?')" rows="3"></textarea>
             <button onclick="askAI()">Ask AI</button>
             <div id="aiResult" class="result"></div>

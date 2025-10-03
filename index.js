@@ -189,8 +189,8 @@ app.get('/auth/callback', async (req, res) => {
 
     const tokens = await getTokens(code);
     
-    // Redirect back to test page with token in URL
-    const redirectUrl = `/test.html?token=${tokens.access_token}`;
+    // Redirect back to mobile app with deep link
+    const redirectUrl = `datavizai://auth/callback?token=${tokens.access_token}`;
     res.redirect(redirectUrl);
   } catch (error) {
     console.error('Auth callback error:', error);
