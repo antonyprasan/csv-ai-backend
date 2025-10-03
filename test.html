@@ -119,11 +119,23 @@
             if (token) {
                 accessToken = token;
                 document.getElementById('authResult').innerHTML = 
-                    '<div class="success">✅ Authentication successful! You can now load your Google Sheets.</div>';
+                    '<div class="success">✅ Authentication successful!<br><br>Redirecting to mobile app...</div>';
                 document.getElementById('tokenStatus').textContent = 'SET';
                 
                 // Clean up the URL
                 window.history.replaceState({}, document.title, window.location.pathname);
+                
+                // Try to redirect to mobile app using Expo deep link
+                setTimeout(() => {
+                    try {
+                        // Try the current Expo tunnel URL
+                        window.location.href = 'exp://zrfjqd0-anonymous-8081.exp.direct/--/auth/callback?token=' + token;
+                    } catch (e) {
+                        console.log('Deep link failed, showing manual instructions');
+                        document.getElementById('authResult').innerHTML = 
+                            '<div class="success">✅ Authentication successful!<br><br>Please return to your mobile app manually.</div>';
+                    }
+                }, 2000);
             }
         });
 

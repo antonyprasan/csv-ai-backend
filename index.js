@@ -14,6 +14,9 @@ const app = express();
 const upload = multer({ dest: "uploads/" });
 const port = process.env.PORT || 3000;
 
+// Store temporary tokens (in production, use a proper database)
+const tempTokens = new Map();
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static('.')); // Serve static files
@@ -189,12 +192,36 @@ app.get('/auth/callback', async (req, res) => {
 
     const tokens = await getTokens(code);
     
-    // Redirect back to mobile app with deep link
-    const redirectUrl = `datavizai://auth/callback?token=${tokens.access_token}`;
+    // Store the token temporarily
+    const sessionId = Math.random().toString(36).substring(2, 15);
+    tempTokens.set(sessionId, tokens);
+    
+    // Redirect to test page with token
+    const redirectUrl = `/test.html?token=${tokens.access_token}`;
     res.redirect(redirectUrl);
   } catch (error) {
     console.error('Auth callback error:', error);
     res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
+// Get the latest token (simple approach)
+app.get('/auth/latest-token', (req, res) => {
+  try {
+    // Get the most recent token from tempTokens
+    const latestToken = Array.from(tempTokens.values()).pop();
+    if (!latestToken) {
+      return res.status(404).json({ error: 'No token available' });
+    }
+
+    res.json({ 
+      success: true, 
+      accessToken: latestToken.access_token,
+      refreshToken: latestToken.refresh_token 
+    });
+  } catch (error) {
+    console.error('Get token error:', error);
+    res.status(500).json({ error: 'Failed to retrieve token' });
   }
 });
 
