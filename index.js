@@ -196,9 +196,98 @@ app.get('/auth/callback', async (req, res) => {
     const sessionId = Math.random().toString(36).substring(2, 15);
     tempTokens.set(sessionId, tokens);
     
-    // Redirect to test page with token
-    const redirectUrl = `/test.html?token=${tokens.access_token}`;
-    res.redirect(redirectUrl);
+    // Return a professional OAuth success page
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Authentication Successful - DataViz AI</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+          }
+          .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 50px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+          }
+          .logo {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #fff, #f0f0f0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+          }
+          .success {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #4CAF50;
+          }
+          .message {
+            font-size: 16px;
+            opacity: 0.9;
+            line-height: 1.5;
+            margin-bottom: 30px;
+          }
+          .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+          }
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          .status {
+            font-size: 14px;
+            opacity: 0.8;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="logo">📊 DataViz AI</div>
+          <div class="success">✅ Authentication Successful!</div>
+          <div class="message">
+            You have successfully connected your Google account.<br>
+            You can now close this window and return to your mobile app.
+          </div>
+          <div class="spinner"></div>
+          <div class="status">Returning to DataViz AI...</div>
+        </div>
+        <script>
+          // Auto-close the window after 3 seconds
+          setTimeout(() => {
+            window.close();
+          }, 3000);
+        </script>
+      </body>
+      </html>
+    `);
   } catch (error) {
     console.error('Auth callback error:', error);
     res.status(500).json({ error: 'Authentication failed' });

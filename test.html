@@ -128,7 +128,7 @@
                 // Try to redirect to mobile app using Expo deep link
                 setTimeout(() => {
                     try {
-                        // Try the current Expo tunnel URL
+                        // Try the current Expo tunnel URL (update this with your current tunnel URL)
                         window.location.href = 'exp://zrfjqd0-anonymous-8081.exp.direct/--/auth/callback?token=' + token;
                     } catch (e) {
                         console.log('Deep link failed, showing manual instructions');
