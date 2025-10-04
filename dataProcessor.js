@@ -123,7 +123,7 @@ function removeDuplicates(data) {
 }
 
 function createOptimizedPrompt(processedData, question, summary) {
-  let prompt = `You are an expert data analyst. Analyze the following data and answer the question.
+  let prompt = `You are an expert data analyst with forecasting capabilities. Analyze the following data and answer the question.
 
 Data Summary:
 - Total Records: ${processedData.totalRecords || summary.totalRecords}
@@ -143,11 +143,24 @@ Data Summary:
     });
   }
 
+  // Add forecasting capability if question asks for predictions
+  if (isForecastingQuestion(question)) {
+    prompt += `\nFORECASTING CAPABILITY:
+You can provide simple trend-based forecasts. For forecasting questions:
+1. Analyze the trend in the data
+2. Calculate average growth/decline rate
+3. Project future values based on the trend
+4. Provide confidence levels based on data quality
+5. Include limitations about forecast accuracy
+
+`;
+  }
+
   prompt += `\nSample Data (${processedData.sampleSize || summary.sampleSize} records):\n${JSON.stringify(processedData.fullData, null, 2)}
 
 Question: ${question}
 
-Provide a comprehensive analysis. If the sample data is insufficient for the question, mention this limitation.
+Provide a comprehensive analysis. If the question asks for forecasts or predictions, provide trend-based forecasting with confidence levels.
 
 Respond in JSON format:
 {
@@ -162,8 +175,66 @@ Respond in JSON format:
   return prompt;
 }
 
+function isForecastingQuestion(question) {
+  const forecastingKeywords = [
+    'forecast', 'predict', 'future', 'next month', 'next quarter', 'next year',
+    'trend', 'projection', 'will be', 'going to', 'expect', 'likely',
+    'forecasting', 'prediction', 'upcoming', 'forthcoming'
+  ];
+  
+  const lowerQuestion = question.toLowerCase();
+  return forecastingKeywords.some(keyword => lowerQuestion.includes(keyword));
+}
+
+function generateSimpleForecast(data, periods = 3) {
+  if (!data || data.length < 2) return null;
+  
+  // Extract numeric values from data
+  const values = data.map(d => {
+    if (typeof d === 'object' && d !== null) {
+      // Find first numeric value in the object
+      for (let key in d) {
+        const val = parseFloat(d[key]);
+        if (!isNaN(val)) return val;
+      }
+      return 0;
+    }
+    return typeof d === 'string' ? parseFloat(d) || 0 : (typeof d === 'number' ? d : 0);
+  }).filter(v => !isNaN(v) && v > 0);
+  
+  if (values.length < 2) return null;
+  
+  // Calculate trend
+  const firstHalf = values.slice(0, Math.floor(values.length / 2));
+  const secondHalf = values.slice(Math.floor(values.length / 2));
+  const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+  const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+  const trend = secondAvg - firstAvg;
+  
+  // Generate forecast
+  const lastValue = values[values.length - 1];
+  const forecast = Array.from({length: periods}, (_, i) => 
+    Math.max(0, lastValue + (trend * (i + 1)))
+  );
+  
+  // Calculate confidence based on data quality
+  let confidence = 'low';
+  if (values.length >= 6) confidence = 'medium';
+  if (values.length >= 12 && Math.abs(trend) > 0) confidence = 'high';
+  
+  return {
+    forecast: forecast,
+    trend: trend,
+    confidence: confidence,
+    lastValue: lastValue,
+    periods: periods
+  };
+}
+
 module.exports = {
   processDataForAI,
   generateDataSummary,
-  createOptimizedPrompt
+  createOptimizedPrompt,
+  isForecastingQuestion,
+  generateSimpleForecast
 };

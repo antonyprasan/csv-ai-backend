@@ -9,7 +9,7 @@ const { OpenAI } = require("openai");
 
 const { google } = require("googleapis");
 const { getAuthUrl, getTokens, fetchSheetData } = require('./googleAuth');
-const { processDataForAI, createOptimizedPrompt } = require('./dataProcessor');
+const { processDataForAI, createOptimizedPrompt, isForecastingQuestion, generateSimpleForecast } = require('./dataProcessor');
 const app = express();
 const upload = multer({ dest: "uploads/" });
 const port = process.env.PORT || 3000;
@@ -280,9 +280,25 @@ app.get('/auth/callback', async (req, res) => {
           <div class="status">Returning to DataViz AI...</div>
         </div>
         <script>
-          // Auto-close the window after 3 seconds
+          // Try to redirect to mobile app immediately
           setTimeout(() => {
-            window.close();
+            try {
+              // Try to redirect to the mobile app using the current Expo tunnel URL
+              window.location.href = 'exp://zrfjqd0-anonymous-8081.exp.direct/--/auth/callback?token=' + encodeURIComponent('${tokens.access_token}');
+            } catch (e) {
+              console.log('Deep link failed, trying to close window');
+              // Fallback: try to close the window
+              window.close();
+            }
+          }, 1000);
+          
+          // Backup: try to close after 3 seconds if redirect fails
+          setTimeout(() => {
+            try {
+              window.close();
+            } catch (e) {
+              console.log('Cannot close window, user needs to close manually');
+            }
           }, 3000);
         </script>
       </body>
