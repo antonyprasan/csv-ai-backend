@@ -13,14 +13,19 @@ function processDataForAI(data, question) {
   }
   
   // For large datasets, create intelligent sampling
-  const sampleSize = Math.min(200, dataLength);
+  const sampleSize = Math.min(2000, dataLength); // Increased from 200
   let sampledData = [];
   
-  // Stratified sampling - get representative data across the dataset
-  const step = Math.floor(dataLength / sampleSize);
-  for (let i = 0; i < dataLength; i += step) {
-    if (sampledData.length < sampleSize) {
-      sampledData.push(data[i]);
+  // Time-based sampling for time series data
+  if (hasDateColumn(data)) {
+    sampledData = timeBasedSampling(data, sampleSize);
+  } else {
+    // Stratified sampling - get representative data across the dataset
+    const step = Math.floor(dataLength / sampleSize);
+    for (let i = 0; i < dataLength; i += step) {
+      if (sampledData.length < sampleSize) {
+        sampledData.push(data[i]);
+      }
     }
   }
   
@@ -122,57 +127,191 @@ function removeDuplicates(data) {
   });
 }
 
-function createOptimizedPrompt(processedData, question, summary) {
-  let prompt = `You are an expert data analyst with forecasting capabilities. Analyze the following data and answer the question.
+function hasDateColumn(data) {
+  if (!data || data.length === 0) return false;
+  const firstRow = data[0];
+  return Object.keys(firstRow).some(key => {
+    const sampleValues = data.slice(0, 10).map(row => row[key]);
+    return isDateColumn(sampleValues);
+  });
+}
 
-Data Summary:
-- Total Records: ${processedData.totalRecords || summary.totalRecords}
+function timeBasedSampling(data, sampleSize) {
+  // Sort by date if possible
+  const sortedData = [...data].sort((a, b) => {
+    const dateA = getDateValue(a);
+    const dateB = getDateValue(b);
+    return dateA - dateB;
+  });
+  
+  // Sample evenly across time periods
+  const step = Math.floor(sortedData.length / sampleSize);
+  const sampled = [];
+  
+  for (let i = 0; i < sortedData.length; i += step) {
+    if (sampled.length < sampleSize) {
+      sampled.push(sortedData[i]);
+    }
+  }
+  
+  return sampled;
+}
+
+function getDateValue(row) {
+  // Try to find a date column and return timestamp
+  for (let key in row) {
+    const value = row[key];
+    if (typeof value === 'string') {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        return date.getTime();
+      }
+    }
+  }
+  return 0;
+}
+
+function createOptimizedPrompt(processedData, question, summary) {
+  // Detect business type from data
+  const businessType = detectBusinessType(processedData.fullData);
+  const businessContext = getBusinessContext(businessType);
+  
+  let prompt = `You are a senior business analyst and consultant with expertise in ${businessType}. Your goal is to provide actionable business insights that drive growth and profitability.
+
+BUSINESS CONTEXT:
+- Business Type: ${businessType}
+- Focus Areas: ${businessContext}
+- Priority: Practical insights that business owners can implement immediately
+
+DATA OVERVIEW:
+- Total Records Analyzed: ${processedData.totalRecords || summary.totalRecords}
 - Sample Size: ${processedData.sampleSize || summary.sampleSize}
-- Columns: ${summary.columns.join(', ')}
-- Numeric Columns: ${summary.numericColumns.join(', ')}
-- Date Columns: ${summary.dateColumns.join(', ')}
-- Categorical Columns: ${summary.categoricalColumns.join(', ')}
+- Key Metrics: ${summary.numericColumns.join(', ')}
+- Time Period: ${getDateRange(processedData.fullData)}
+
+BUSINESS INTELLIGENCE REQUEST: ${question}
+
+ANALYSIS REQUIREMENTS:
+1. Provide clear, actionable business insights (not just data analysis)
+2. Include specific recommendations with potential impact
+3. Focus on opportunities for growth and optimization
+4. Use business language, not technical jargon
+5. Highlight the most important findings first
 
 `;
-
-  // Add numeric statistics if available
-  if (Object.keys(summary.numericStats).length > 0) {
-    prompt += `\nNumeric Statistics:\n`;
-    Object.entries(summary.numericStats).forEach(([col, stats]) => {
-      prompt += `- ${col}: min=${stats.min}, max=${stats.max}, avg=${stats.avg.toFixed(2)}\n`;
-    });
-  }
 
   // Add forecasting capability if question asks for predictions
   if (isForecastingQuestion(question)) {
-    prompt += `\nFORECASTING CAPABILITY:
-You can provide simple trend-based forecasts. For forecasting questions:
-1. Analyze the trend in the data
-2. Calculate average growth/decline rate
-3. Project future values based on the trend
-4. Provide confidence levels based on data quality
-5. Include limitations about forecast accuracy
+    prompt += `FORECASTING CAPABILITY:
+For forecasting questions, provide:
+1. Trend analysis with business implications
+2. Growth/decline projections with confidence levels
+3. Strategic recommendations based on forecasts
+4. Risk factors and contingency planning
 
 `;
   }
 
-  prompt += `\nSample Data (${processedData.sampleSize || summary.sampleSize} records):\n${JSON.stringify(processedData.fullData, null, 2)}
+  prompt += `Sample Data (${processedData.sampleSize || summary.sampleSize} records):\n${JSON.stringify(processedData.fullData, null, 2)}
 
-Question: ${question}
+IMPORTANT: This analysis is based on ${processedData.sampleSize || summary.sampleSize} records sampled from ${processedData.totalRecords || summary.totalRecords} total records, ensuring representative insights across your entire dataset.
 
-Provide a comprehensive analysis. If the question asks for forecasts or predictions, provide trend-based forecasting with confidence levels.
-
-Respond in JSON format:
+REQUIRED OUTPUT FORMAT:
 {
-  "answer": "detailed analysis",
+  "answer": "Clear business explanation with specific actionable recommendations",
+  "keyInsights": ["Top 3 business insights from the data"],
+  "recommendations": ["Specific actions to take based on findings"],
+  "potentialImpact": "Expected business impact of implementing recommendations",
+  "nextSteps": ["Immediate next steps to implement recommendations"],
   "labels": [...],
   "data": [...],
   "type": "pie|bar|line",
   "confidence": "high|medium|low",
-  "limitations": "any limitations of the analysis"
-}`;
+  "limitations": "Any limitations of the analysis"
+}
+
+Focus on business value, growth opportunities, and actionable insights.`;
 
   return prompt;
+}
+
+// New helper functions for business context
+function detectBusinessType(data) {
+  if (!data || data.length === 0) return 'general business';
+  
+  const columns = Object.keys(data[0] || {});
+  const lowerColumns = columns.map(c => c.toLowerCase());
+  
+  // Check for retail/e-commerce indicators
+  if (lowerColumns.some(c => 
+    c.includes('product') || c.includes('item') || c.includes('sku') || 
+    c.includes('inventory') || c.includes('category')
+  )) {
+    return 'retail/e-commerce';
+  }
+  
+  // Check for service business indicators
+  if (lowerColumns.some(c => 
+    c.includes('customer') || c.includes('client') || c.includes('service') ||
+    c.includes('appointment') || c.includes('booking')
+  )) {
+    return 'service business';
+  }
+  
+  // Check for sales/financial indicators
+  if (lowerColumns.some(c => 
+    c.includes('revenue') || c.includes('sales') || c.includes('profit') ||
+    c.includes('commission') || c.includes('deal')
+  )) {
+    return 'sales/financial business';
+  }
+  
+  // Check for restaurant/food service indicators
+  if (lowerColumns.some(c => 
+    c.includes('menu') || c.includes('dish') || c.includes('order') ||
+    c.includes('table') || c.includes('check')
+  )) {
+    return 'restaurant/food service';
+  }
+  
+  return 'general business';
+}
+
+function getBusinessContext(businessType) {
+  const contexts = {
+    'retail/e-commerce': 'product performance, inventory optimization, customer behavior, seasonal trends, revenue growth',
+    'service business': 'customer retention, service efficiency, pricing optimization, client satisfaction, operational growth',
+    'sales/financial business': 'revenue trends, sales forecasting, conversion rates, market opportunities, profit optimization',
+    'restaurant/food service': 'menu optimization, customer preferences, operational efficiency, revenue per table, seasonal patterns',
+    'general business': 'growth opportunities, operational efficiency, revenue optimization, market insights, strategic planning'
+  };
+  return contexts[businessType] || contexts['general business'];
+}
+
+function getDateRange(data) {
+  if (!data || data.length === 0) return 'No date information';
+  
+  // Try to find date columns
+  const firstRow = data[0];
+  let dateColumn = null;
+  
+  for (let key in firstRow) {
+    const sampleValues = data.slice(0, 5).map(row => row[key]);
+    if (isDateColumn(sampleValues)) {
+      dateColumn = key;
+      break;
+    }
+  }
+  
+  if (dateColumn) {
+    const dates = data.map(row => row[dateColumn]).filter(d => d);
+    if (dates.length > 0) {
+      const sortedDates = dates.sort();
+      return `${sortedDates[0]} to ${sortedDates[sortedDates.length - 1]}`;
+    }
+  }
+  
+  return 'Time period not specified';
 }
 
 function isForecastingQuestion(question) {
@@ -236,5 +375,8 @@ module.exports = {
   generateDataSummary,
   createOptimizedPrompt,
   isForecastingQuestion,
-  generateSimpleForecast
+  generateSimpleForecast,
+  detectBusinessType,
+  getBusinessContext,
+  getDateRange
 };
