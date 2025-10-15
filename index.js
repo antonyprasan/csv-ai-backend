@@ -11,7 +11,7 @@ const { google } = require("googleapis");
 const { getAuthUrl, getTokens, fetchSheetData } = require('./googleAuth');
 const { processDataForAI, createOptimizedPrompt, isForecastingQuestion, generateSimpleForecast } = require('./dataProcessor');
 const { chatWithAgent, quickAnalysis, clearConversationMemory } = require('./aiProvider');
-const { rateLimitMiddleware, getRemainingRequests } = require('./rateLimiter');
+const { rateLimitMiddleware, getRemainingRequests, requestCounts } = require('./rateLimiter');
 
 const app = express();
 const upload = multer({ dest: "uploads/" });
@@ -100,7 +100,7 @@ app.post("/api/ask", upload.single("csv"), async (req, res) => {
 
 // NEW: Chat endpoint with rate limiting and memory
 app.post("/api/chat", 
-  rateLimitMiddleware(parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 10),
+  rateLimitMiddleware(parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 100),
   async (req, res) => {
     try {
       const { sessionId, message, csvData } = req.body;
@@ -130,7 +130,7 @@ app.post("/api/chat",
       // Add rate limit info to response
       const ip = req.ip || req.connection.remoteAddress;
       response.rateLimit = {
-        remaining: getRemainingRequests(ip, parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 10),
+        remaining: getRemainingRequests(ip, parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 100),
       };
 
       res.json(response);
@@ -148,7 +148,7 @@ app.post("/api/chat",
 // NEW: Upload CSV and start chat session
 app.post("/api/chat/upload", 
   upload.single("csv"),
-  rateLimitMiddleware(parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 10),
+  rateLimitMiddleware(parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 100),
   async (req, res) => {
     try {
       const filePath = req.file.path;
@@ -196,11 +196,27 @@ app.post("/api/chat/clear", async (req, res) => {
 // NEW: Get rate limit status
 app.get("/api/rate-limit", (req, res) => {
   const ip = req.ip || req.connection.remoteAddress;
-  const remaining = getRemainingRequests(ip, parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 10);
+  const remaining = getRemainingRequests(ip, parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 100);
   
   res.json({
     remaining: remaining,
-    limit: parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 10,
+    limit: parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 100,
+  });
+});
+
+// NEW: Reset rate limit for testing (remove in production)
+app.post("/api/rate-limit/reset", (req, res) => {
+  const ip = req.ip || req.connection.remoteAddress;
+  const today = new Date().toDateString();
+  const key = `${ip}-${today}`;
+  
+  // Clear the rate limit for this IP
+  requestCounts.delete(key);
+  
+  res.json({
+    success: true,
+    message: "Rate limit reset for today",
+    limit: parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 100,
   });
 });
 

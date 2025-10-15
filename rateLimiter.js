@@ -105,5 +105,6 @@ module.exports = {
   getRemainingRequests,
   rateLimitMiddleware,
   resetCounters,
+  requestCounts,
 };
 
