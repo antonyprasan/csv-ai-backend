@@ -91,7 +91,7 @@ Respond in JSON format with:
 
     // Add conversation history
     if (Array.isArray(previousMessages)) {
-      previousMessages.forEach((msg: any) => {
+      previousMessages.forEach((msg) => {
         messages.push({
           role: msg._getType() === 'human' ? 'user' : 'assistant',
           content: msg.content
