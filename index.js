@@ -98,9 +98,8 @@ app.post("/api/ask", upload.single("csv"), async (req, res) => {
   }
 });
 
-// NEW: Chat endpoint with rate limiting and memory
+// NEW: Chat endpoint with memory (rate limiting handled by Groq)
 app.post("/api/chat", 
-  rateLimitMiddleware(parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 100),
   async (req, res) => {
     try {
       const { sessionId, message, csvData } = req.body;
@@ -127,11 +126,7 @@ app.post("/api/chat",
         provider
       );
 
-      // Add rate limit info to response
-      const ip = req.ip || req.connection.remoteAddress;
-      response.rateLimit = {
-        remaining: getRemainingRequests(ip, parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 100),
-      };
+      // Rate limiting now handled by Groq API
 
       res.json(response);
     } catch (err) {
@@ -148,7 +143,6 @@ app.post("/api/chat",
 // NEW: Upload CSV and start chat session
 app.post("/api/chat/upload", 
   upload.single("csv"),
-  rateLimitMiddleware(parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 100),
   async (req, res) => {
     try {
       const filePath = req.file.path;
