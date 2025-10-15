@@ -136,7 +136,11 @@ app.post("/api/chat",
       res.json(response);
     } catch (err) {
       console.error('Chat error:', err);
-      res.status(500).json({ error: "Failed to process chat message" });
+      res.status(500).json({ 
+        error: "Failed to process chat message",
+        details: err.message,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      });
     }
   }
 );
