@@ -65,46 +65,31 @@ async function chatWithAgent(sessionId, userMessage, csvContext, provider = 'gro
     const memory = getConversationMemory(sessionId);
 
     // Create a specialized prompt for CSV data analysis
-    const template = `You are an expert data analyst and business intelligence assistant. You help users understand their CSV data by providing clear insights, actionable recommendations, and data visualizations.
+    const systemContext = `You are an expert data analyst and business intelligence assistant. You help users understand their CSV data by providing clear insights, actionable recommendations, and data visualizations.
 
 Current CSV Data Context:
-{csv_context}
+${csvContext}
 
-Chat History:
-{chat_history}
-
-User Question: {input}
-
-Provide a comprehensive response that includes:
-1. Direct answer to the question
-2. Key insights (if applicable)
-3. Recommendations (if applicable)
-4. Chart data if visualization would help (return as JSON with labels and data arrays)
-
-Format your response as JSON with these fields:
+Provide responses as JSON with these fields:
 - answer: string (your main response)
 - keyInsights: array of strings (optional)
 - recommendations: array of strings (optional)
 - potentialImpact: string (optional)
 - nextSteps: array of strings (optional)
 - chartData: object with labels (array), data (array), and type (pie/bar/line) (optional)
-- confidence: string (optional)
 
-Response:`;
+Always respond in valid JSON format.`;
 
-    const prompt = PromptTemplate.fromTemplate(template);
-    
     const chain = new ConversationChain({
       llm: model,
       memory: memory,
-      prompt: prompt,
       verbose: false,
     });
 
-    // Execute the chain with CSV context
+    // Execute the chain with CSV context included in the message
+    const fullMessage = `${systemContext}\n\nUser Question: ${userMessage}`;
     const response = await chain.call({
-      input: userMessage,
-      csv_context: csvContext,
+      input: fullMessage,
     });
 
     // Parse the response
