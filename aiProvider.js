@@ -36,7 +36,7 @@ function getAIModel(provider = 'groq') {
     case 'groq':
       return new ChatGroq({
         apiKey: process.env.GROQ_API_KEY,
-        model: "llama-3.1-70b-versatile",
+        model: "llama-3.3-70b-versatile", // Updated to current model
         temperature: 0.7,
       });
     
