@@ -106,7 +106,13 @@ Respond in JSON format with:
     });
 
     // Call AI directly
+    console.log('Calling AI with messages:', messages.length);
     const response = await model.invoke(messages);
+    console.log('AI Response:', {
+      content: response.content?.substring(0, 100) + '...',
+      hasContent: !!response.content,
+      responseType: typeof response
+    });
 
     // Save to memory
     await memory.saveContext(
@@ -117,20 +123,37 @@ Respond in JSON format with:
     // Parse the response
     let parsedResponse;
     try {
-      // Try to extract JSON from the response
-      const content = response.content || response.text || '';
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsedResponse = JSON.parse(jsonMatch[0]);
-      } else {
+      const content = response.content || response.text || response.message || '';
+      
+      // If content is empty, provide a default response
+      if (!content || content.trim() === '') {
         parsedResponse = {
-          answer: content,
+          answer: "I'm sorry, I didn't receive a response. Please try asking your question again.",
         };
+      } else {
+        // Try to extract JSON from the response
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            parsedResponse = JSON.parse(jsonMatch[0]);
+          } catch (jsonError) {
+            // JSON parsing failed, use content as answer
+            parsedResponse = {
+              answer: content,
+            };
+          }
+        } else {
+          // No JSON found, use content as answer
+          parsedResponse = {
+            answer: content,
+          };
+        }
       }
     } catch (e) {
+      console.error('Error parsing response:', e);
       // Fallback to text response
       parsedResponse = {
-        answer: response.content || response.text || 'No response',
+        answer: response.content || response.text || response.message || "I'm sorry, I couldn't process your request. Please try again.",
       };
     }
 
