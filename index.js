@@ -10,12 +10,18 @@ const { OpenAI } = require("openai");
 const { google } = require("googleapis");
 const { getAuthUrl, getTokens, fetchSheetData } = require('./googleAuth');
 const { processDataForAI, createOptimizedPrompt, isForecastingQuestion, generateSimpleForecast } = require('./dataProcessor');
+const { chatWithAgent, quickAnalysis, clearConversationMemory } = require('./aiProvider');
+const { rateLimitMiddleware, getRemainingRequests } = require('./rateLimiter');
+
 const app = express();
 const upload = multer({ dest: "uploads/" });
 const port = process.env.PORT || 3000;
 
 // Store temporary tokens (in production, use a proper database)
 const tempTokens = new Map();
+
+// Store CSV data per session (in production, use database or cloud storage)
+const sessionData = new Map();
 
 app.use(cors());
 app.use(express.json());
@@ -90,6 +96,108 @@ app.post("/api/ask", upload.single("csv"), async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Something went wrong" });
   }
+});
+
+// NEW: Chat endpoint with rate limiting and memory
+app.post("/api/chat", 
+  rateLimitMiddleware(parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 10),
+  async (req, res) => {
+    try {
+      const { sessionId, message, csvData } = req.body;
+      const provider = process.env.AI_PROVIDER || 'groq';
+      
+      if (!sessionId || !message) {
+        return res.status(400).json({ error: "Missing sessionId or message" });
+      }
+
+      // Get CSV data from session storage or use provided data
+      let contextData = sessionData.get(sessionId) || csvData;
+      
+      if (!contextData) {
+        return res.status(400).json({ 
+          error: "No CSV data found. Please upload a file first." 
+        });
+      }
+
+      // Use agentic chat with memory
+      const response = await chatWithAgent(
+        sessionId, 
+        message, 
+        JSON.stringify(contextData).substring(0, 3000), // Limit context size
+        provider
+      );
+
+      // Add rate limit info to response
+      const ip = req.ip || req.connection.remoteAddress;
+      response.rateLimit = {
+        remaining: getRemainingRequests(ip, parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 10),
+      };
+
+      res.json(response);
+    } catch (err) {
+      console.error('Chat error:', err);
+      res.status(500).json({ error: "Failed to process chat message" });
+    }
+  }
+);
+
+// NEW: Upload CSV and start chat session
+app.post("/api/chat/upload", 
+  upload.single("csv"),
+  rateLimitMiddleware(parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 10),
+  async (req, res) => {
+    try {
+      const filePath = req.file.path;
+      const sessionId = req.body.sessionId || `session-${Date.now()}`;
+
+      const data = await parseCSV(filePath);
+      
+      // Store CSV data for this session
+      sessionData.set(sessionId, data);
+
+      // Clean up file
+      fs.unlink(filePath, () => {});
+
+      res.json({
+        success: true,
+        sessionId: sessionId,
+        recordCount: data.length,
+        columns: Object.keys(data[0] || {}),
+        message: "CSV uploaded successfully. You can now start asking questions!"
+      });
+    } catch (err) {
+      console.error('Upload error:', err);
+      res.status(500).json({ error: "Failed to upload CSV" });
+    }
+  }
+);
+
+// NEW: Clear chat history
+app.post("/api/chat/clear", async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    
+    if (sessionId) {
+      clearConversationMemory(sessionId);
+      sessionData.delete(sessionId);
+    }
+
+    res.json({ success: true, message: "Chat history cleared" });
+  } catch (err) {
+    console.error('Clear error:', err);
+    res.status(500).json({ error: "Failed to clear chat" });
+  }
+});
+
+// NEW: Get rate limit status
+app.get("/api/rate-limit", (req, res) => {
+  const ip = req.ip || req.connection.remoteAddress;
+  const remaining = getRemainingRequests(ip, parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 10);
+  
+  res.json({
+    remaining: remaining,
+    limit: parseInt(process.env.MAX_REQUESTS_PER_IP_PER_DAY) || 10,
+  });
 });
 
 app.post('/api/ask-sheets', async (req, res) => {
