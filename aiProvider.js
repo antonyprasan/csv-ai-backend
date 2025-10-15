@@ -64,21 +64,25 @@ async function chatWithAgent(sessionId, userMessage, csvContext, provider = 'gro
     const model = getAIModel(provider);
     const memory = getConversationMemory(sessionId);
 
-    // Create a specialized prompt for CSV data analysis
-    const systemContext = `You are an expert data analyst and business intelligence assistant. You help users understand their CSV data by providing clear insights, actionable recommendations, and data visualizations.
+    // For the first message, include CSV context
+    const messageCount = await memory.chatHistory?.getMessages?.()?.length || 0;
+    let fullMessage = userMessage;
+    
+    if (messageCount === 0) {
+      // First message - include CSV context
+      fullMessage = `You are an expert data analyst. Analyze this CSV data and answer questions about it.
 
-Current CSV Data Context:
+CSV Data Summary:
 ${csvContext}
 
-Provide responses as JSON with these fields:
-- answer: string (your main response)
-- keyInsights: array of strings (optional)
-- recommendations: array of strings (optional)
-- potentialImpact: string (optional)
-- nextSteps: array of strings (optional)
-- chartData: object with labels (array), data (array), and type (pie/bar/line) (optional)
+Respond in JSON format with these fields:
+- answer: string
+- keyInsights: array (optional)
+- recommendations: array (optional)
+- chartData: object with labels, data, type (optional)
 
-Always respond in valid JSON format.`;
+User Question: ${userMessage}`;
+    }
 
     const chain = new ConversationChain({
       llm: model,
@@ -86,9 +90,8 @@ Always respond in valid JSON format.`;
       verbose: false,
     });
 
-    // Execute the chain with CSV context included in the message
-    const fullMessage = `${systemContext}\n\nUser Question: ${userMessage}`;
-    const response = await chain.call({
+    // Execute the chain
+    const response = await chain.invoke({
       input: fullMessage,
     });
 
