@@ -58,60 +58,79 @@ function getAIModel(provider = 'groq') {
 
 /**
  * Chat with AI agent using conversation memory
+ * Simplified approach: manually manage chat history
  */
 async function chatWithAgent(sessionId, userMessage, csvContext, provider = 'groq') {
   try {
     const model = getAIModel(provider);
     const memory = getConversationMemory(sessionId);
 
-    // For the first message, include CSV context
-    const messageCount = await memory.chatHistory?.getMessages?.()?.length || 0;
-    let fullMessage = userMessage;
-    
-    if (messageCount === 0) {
-      // First message - include CSV context
-      fullMessage = `You are an expert data analyst. Analyze this CSV data and answer questions about it.
+    // Get chat history
+    const chatHistory = await memory.loadMemoryVariables({});
+    const previousMessages = chatHistory.chat_history || [];
 
-CSV Data Summary:
+    // Build messages array for AI
+    const messages = [];
+    
+    // Add system message on first interaction
+    if (previousMessages.length === 0) {
+      messages.push({
+        role: 'system',
+        content: `You are an expert data analyst. Analyze this CSV data and help answer questions.
+
+CSV Data:
 ${csvContext}
 
-Respond in JSON format with these fields:
-- answer: string
-- keyInsights: array (optional)
-- recommendations: array (optional)
-- chartData: object with labels, data, type (optional)
-
-User Question: ${userMessage}`;
+Respond in JSON format with:
+- answer: your analysis
+- keyInsights: key findings (optional)
+- recommendations: suggestions (optional)
+- chartData: {labels: [], data: [], type: "pie|bar|line"} (optional)`
+      });
     }
 
-    const chain = new ConversationChain({
-      llm: model,
-      memory: memory,
-      verbose: false,
+    // Add conversation history
+    if (Array.isArray(previousMessages)) {
+      previousMessages.forEach((msg: any) => {
+        messages.push({
+          role: msg._getType() === 'human' ? 'user' : 'assistant',
+          content: msg.content
+        });
+      });
+    }
+
+    // Add current message
+    messages.push({
+      role: 'user',
+      content: userMessage
     });
 
-    // Execute the chain
-    const response = await chain.invoke({
-      input: fullMessage,
-    });
+    // Call AI directly
+    const response = await model.invoke(messages);
+
+    // Save to memory
+    await memory.saveContext(
+      { input: userMessage },
+      { output: response.content }
+    );
 
     // Parse the response
     let parsedResponse;
     try {
       // Try to extract JSON from the response
-      const jsonMatch = response.response.match(/\{[\s\S]*\}/);
+      const content = response.content || response.text || '';
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         parsedResponse = JSON.parse(jsonMatch[0]);
       } else {
-        // If no JSON, wrap text response
         parsedResponse = {
-          answer: response.response,
+          answer: content,
         };
       }
     } catch (e) {
       // Fallback to text response
       parsedResponse = {
-        answer: response.response,
+        answer: response.content || response.text || 'No response',
       };
     }
 
