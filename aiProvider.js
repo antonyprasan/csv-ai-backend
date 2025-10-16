@@ -72,11 +72,10 @@ async function chatWithAgent(sessionId, userMessage, csvContext, provider = 'gro
     // Build messages array for AI
     const messages = [];
     
-    // Add system message on first interaction
-    if (previousMessages.length === 0) {
-      messages.push({
-        role: 'system',
-        content: `You are an expert data analyst. Analyze this CSV data and help answer questions.
+    // Always include CSV context for every message
+    messages.push({
+      role: 'system',
+      content: `You are an expert data analyst. Analyze this CSV data and help answer questions.
 
 CSV Data:
 ${csvContext}
@@ -86,8 +85,7 @@ Respond in JSON format with:
 - keyInsights: key findings (optional)
 - recommendations: suggestions (optional)
 - chartData: {labels: [], data: [], type: "pie|bar|line"} (optional)`
-      });
-    }
+    });
 
     // Add conversation history
     if (Array.isArray(previousMessages)) {
