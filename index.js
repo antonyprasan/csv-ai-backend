@@ -159,6 +159,31 @@ app.post("/api/chat/upload",
       console.log('Upload - data records:', data.length);
       console.log('Upload - columns:', Object.keys(data[0] || {}));
       
+      // Validate row count - limit to 1000 rows for demo
+      if (data.length > 1000) {
+        // Clean up file
+        fs.unlink(filePath, () => {});
+        return res.status(400).json({
+          error: "File too large",
+          message: `CSV file contains ${data.length} rows. Maximum allowed is 1000 rows for demo purposes.`,
+          maxRows: 1000,
+          actualRows: data.length
+        });
+      }
+      
+      // Validate column count - limit to 20 columns for demo
+      const columns = Object.keys(data[0] || {});
+      if (columns.length > 20) {
+        // Clean up file
+        fs.unlink(filePath, () => {});
+        return res.status(400).json({
+          error: "Too many columns",
+          message: `CSV file contains ${columns.length} columns. Maximum allowed is 20 columns for demo purposes.`,
+          maxColumns: 20,
+          actualColumns: columns.length
+        });
+      }
+      
       // Store CSV data for this session
       sessionData.set(sessionId, data);
       
