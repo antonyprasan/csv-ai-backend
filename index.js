@@ -112,7 +112,12 @@ app.post("/api/chat",
       // Get CSV data from session storage or use provided data
       let contextData = sessionData.get(sessionId) || csvData;
       
+      console.log('Chat request - sessionId:', sessionId);
+      console.log('Session data exists:', !!sessionData.get(sessionId));
+      console.log('Context data exists:', !!contextData);
+      
       if (!contextData) {
+        console.log('Available sessions:', Array.from(sessionData.keys()));
         return res.status(400).json({ 
           error: "No CSV data found. Please upload a file first." 
         });
@@ -150,8 +155,15 @@ app.post("/api/chat/upload",
 
       const data = await parseCSV(filePath);
       
+      console.log('Upload - sessionId:', sessionId);
+      console.log('Upload - data records:', data.length);
+      console.log('Upload - columns:', Object.keys(data[0] || {}));
+      
       // Store CSV data for this session
       sessionData.set(sessionId, data);
+      
+      console.log('Upload - stored session data for:', sessionId);
+      console.log('Upload - total sessions:', sessionData.size);
 
       // Clean up file
       fs.unlink(filePath, () => {});
